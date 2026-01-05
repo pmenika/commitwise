@@ -1,12 +1,11 @@
-# Safe Commit
+# CommitWise
 
 AI-powered Git commit message generator with code scanning using OpenAI GPT.
 
 ## Installation
 
 ```bash
-cd safe-commit
-npm install -g .
+npm install -g commitwise
 ```
 
 ## Setup
@@ -18,7 +17,7 @@ echo 'export OPENAI_API_KEY="sk-your-api-key-here"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-Or create `~/.safe-commitrc.json`:
+Or create `~/.commitwiserc.json`:
 
 ```json
 {
@@ -32,7 +31,7 @@ Or create `~/.safe-commitrc.json`:
 
 ```bash
 git add .
-safe-commit auto
+commitwise auto
 ```
 
 Scans staged changes, generates a commit message, and lets you accept/edit/regenerate.
@@ -41,14 +40,14 @@ Scans staged changes, generates a commit message, and lets you accept/edit/regen
 
 ```bash
 git add .
-safe-commit suggest
+commitwise suggest
 ```
 
 Prints a commit message without committing.
 
 ## Configuration
 
-Create `.safe-commitrc.json` in your home directory or project root:
+Create `.commitwiserc.json` in your home directory or project root:
 
 ```json
 {

@@ -172,9 +172,9 @@ async function autoCommitFlow(config: AiCommitConfig) {
 const program = new Command();
 
 program
-    .name("ai-commit")
+    .name("commitwise")
     .description("Generate Git commit messages from staged changes using AI")
-    .version("0.1.0");
+    .version("1.0.0");
 
 program
     .command("suggest")

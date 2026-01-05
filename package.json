@@ -1,22 +1,22 @@
 {
-  "name": "safe-commit",
+  "name": "commitwise",
   "version": "1.0.0",
   "description": "AI-powered Git commit message generator using OpenAI GPT",
-  "keywords": ["git", "commit", "ai", "openai", "cli", "conventional-commits", "safe-commit"],
+  "keywords": ["git", "commit", "ai", "openai", "cli", "conventional-commits", "commitwise"],
   "license": "ISC",
   "author": "Purnima Van der Laan",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "safe-commit": "dist/index.js"
+    "commitwise": "dist/index.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pmenika/safe-commit.git"
+    "url": "git+https://github.com/pmenika/commitwise.git"
   },
-  "homepage": "https://github.com/pmenika/safe-commit#readme",
+  "homepage": "https://github.com/pmenika/commitwise#readme",
   "bugs": {
-    "url": "https://github.com/pmenika/safe-commit/issues"
+    "url": "https://github.com/pmenika/commitwise/issues"
   },
   "scripts": {
     "build": "tsc",

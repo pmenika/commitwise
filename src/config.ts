@@ -15,13 +15,13 @@ function readJsonIfExists(filePath: string): Partial<AiCommitConfig> | null {
 }
 
 export function loadConfig(): AiCommitConfig {
-    // 1) Global config: ~/.safe-commitrc.json
-    const globalPath = path.join(os.homedir(), ".safe-commitrc.json");
+    // 1) Global config: ~/.commitwiserc.json
+    const globalPath = path.join(os.homedir(), ".commitwiserc.json");
     const globalCfg = readJsonIfExists(globalPath) ?? {};
 
-    // 2) Project config: <repo>/.safe-commitrc.json
+    // 2) Project config: <repo>/.commitwiserc.json
     // Using process.cwd() assumes user runs the command from the repo directory.
-    const projectPath = path.join(process.cwd(), ".safe-commitrc.json");
+    const projectPath = path.join(process.cwd(), ".commitwiserc.json");
     const projectCfg = readJsonIfExists(projectPath) ?? {};
 
     // 3) Merge: defaults <- global <- project
