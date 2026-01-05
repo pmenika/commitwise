@@ -2,7 +2,7 @@
   "name": "safe-commit",
   "version": "1.0.0",
   "description": "AI-powered Git commit message generator using OpenAI GPT",
-  "keywords": ["git", "commit", "ai", "openai", "cli", "conventional-commits"],
+  "keywords": ["git", "commit", "ai", "openai", "cli", "conventional-commits", "safe-commit"],
   "license": "ISC",
   "author": "Purnima Van der Laan",
   "type": "module",
