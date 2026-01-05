@@ -12,11 +12,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_USERNAME/safe-commit.git"
+    "url": "git+https://github.com/pmenika/safe-commit.git"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/safe-commit#readme",
+  "homepage": "https://github.com/pmenika/safe-commit#readme",
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/safe-commit/issues"
+    "url": "https://github.com/pmenika/safe-commit/issues"
   },
   "scripts": {
     "build": "tsc",
