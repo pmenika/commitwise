@@ -110,9 +110,9 @@ async function autoCommitFlow(config: AiCommitConfig) {
 
         if (scan.issues.length > 0) {
             console.log("\n⚠️ Scan findings:\n");
-            scan.issues.forEach((issue: string, i: number) =>
-                console.log(`${i + 1}. ${issue}`)
-            );
+            scan.issues.forEach((it, i) => {
+                console.log(`${i + 1}. [${it.file}] ${it.issue}`);
+            });
             console.log("");
 
             const proceed = await askChoice("Proceed anyway? (y/n): ");

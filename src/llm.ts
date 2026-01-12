@@ -2,9 +2,15 @@
 import OpenAI from "openai";
 import type { AiCommitConfig } from "./configTypes.js";
 
-interface ScannedResult {
-    issues: string[];
+interface ScannedIssue {
+    file: string; // taken from diff headers, e.g. "src/composables/useCart.ts"
+    issue: string; // short description
 }
+
+interface ScannedResult {
+    issues: ScannedIssue[];
+}
+
 const MAX_CHARS = 15000; // limit input size to avoid LLM overload
 
 function resolveApiKey(config: AiCommitConfig): string {
@@ -43,24 +49,46 @@ export async function scanCodeDiff(
     const SYSTEM_PROMPT = `
         You are a pre-commit safety scanner.
 
-        Only report issues that are true NOW and likely to cause:
+        Report ONLY issues that are TRUE NOW and PROVABLE from the provided staged diff.
+        Only report issues likely to cause:
         - runtime errors
         - incorrect behavior
         - security vulnerabilities
         - crashes
 
+        HARD RULES:
+        - Do NOT report any issue unless the diff explicitly shows the problem.
+        - If you cannot point to a concrete changed line/pattern in the diff, return {"issues":[]}.
+        - Do NOT invent "could be undefined/null" scenarios.
+
         Do NOT report:
-        - speculative future concerns ("if this becomes complex…")
-        - performance/micro-optimization advice (memoization, function recreation, etc.)
-        - best-practice suggestions
-        - refactoring recommendations
-        - UI/CSS/layout concerns
+        - speculative/hypothetical concerns ("if X is undefined/null…", "ensure X exists…")
+        - best practices, refactors, style, performance, UI/CSS
+        - "missing/undefined/null" warnings for statically typed code (TypeScript, defineProps<Props>(), typed emits)
+        UNLESS the diff introduces optional/nullable/unsafe typing or access (?:, null/undefined unions, any, unknown, casts, optional chaining, non-null assertions, removed guards)
 
-        If no real issues exist, return {"issues": []}.
-        Output JSON only: {"issues": string[]}
-        Keep the response short and to the point.
+        ASSUME:
+        - Required typed props/values are present and correctly shaped at runtime unless the diff weakens types.
 
-        `;
+        OUTPUT JSON ONLY in this exact shape:
+        {
+        "issues": [
+            {
+            "file": "path/from the diff header (+++ b/...) without the leading b/",
+            "issue": "short, concrete problem"
+            }
+        ]
+        }
+
+        Rules for "file":
+        - Extract it from diff headers (lines like '+++ b/<path>').
+        - If an issue spans multiple files, create separate issues per file.
+        - Do NOT use placeholders like 'unknown' unless no file headers exist.
+
+        If no evidence-backed issues exist, return {"issues": []}.
+        Keep the response short.
+    `;
+
     const completion = await client.chat.completions.create({
         model,
         messages: [
@@ -82,7 +110,13 @@ export async function scanCodeDiff(
                         issues: {
                             type: "array",
                             items: {
-                                type: "string",
+                                type: "object",
+                                properties: {
+                                    file: { type: "string" },
+                                    issue: { type: "string" },
+                                },
+                                required: ["file", "issue"],
+                                additionalProperties: false,
                             },
                         },
                     },
