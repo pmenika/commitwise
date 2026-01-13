@@ -6,10 +6,17 @@ import { createInterface } from "readline/promises";
 import { stdin as input, stdout as output } from "process";
 import fs from "fs";
 import path from "path";
-
+import { runBestFrontendCheck } from "./frontendCheck.js";
 import { loadConfig } from "./config.js";
 import type { AiCommitConfig } from "./configTypes.js";
-import { generateCommitMessage, scanCodeDiff } from "./llm.js";
+import {
+    generateCommitMessage,
+    scanCodeDiff,
+    summarizeCheckOutput,
+} from "./llm.js";
+import { SYSTEM_PROMPT_NO_CHECKS } from "./prompts/allChecks.js";
+import { SYSTEM_PROMPT_CHECKS_PASSED } from "./prompts/limitedChecks.js";
+import { detectProjectContext } from "./projectContext.js";
 
 /**
  * Read staged changes (what will be committed).
@@ -106,7 +113,71 @@ async function autoCommitFlow(config: AiCommitConfig) {
 
     // 1) Scan for issues (if enabled)
     if (config.scanEnabled) {
-        const scan = await scanCodeDiff(config, diff);
+        const check = runBestFrontendCheck(process.cwd());
+        let prompt = "";
+        if (check.ran) {
+            if (!check.ok) {
+                console.log(`\n❌ ${check.name} failed.\n`);
+
+                // ✅ Use LLM to summarize the check output for humans
+                const explained = await summarizeCheckOutput(
+                    config,
+                    check.name ?? "check",
+                    check.output ?? ""
+                );
+
+                console.log(`Summary: ${explained.summary}\n`);
+
+                if (explained.topIssues.length > 0) {
+                    console.log("Top issues:");
+                    explained.topIssues.slice(0, 5).forEach((it, i) => {
+                        const prefix = it.file ? `[${it.file}] ` : "";
+                        console.log(`${i + 1}. ${prefix}${it.issue}`);
+                    });
+                    console.log("");
+                } else {
+                    // fallback: show raw output if LLM couldn't extract anything
+                    console.log(
+                        check.output ? check.output + "\n" : "(no output)\n"
+                    );
+                }
+
+                const proceed = await askChoice(
+                    "Proceed anyway (use AI fallback)? (y/n): "
+                );
+                if (proceed === "n" || proceed === "no") process.exit(0);
+                // ❗ Checks failed but user chose to proceed
+                // → We must NOT assume checks passed
+                prompt = SYSTEM_PROMPT_NO_CHECKS;
+            } else {
+                console.log(`\n✅ ${check.name} passed.\n`);
+                // ✅ Checks ran and passed
+                // → Safe to assume tooling caught basics
+                prompt = SYSTEM_PROMPT_CHECKS_PASSED;
+            }
+        } else {
+            console.log(
+                "\nℹ️ No runnable scripts found in package.json. Falling back to AI scan.\n"
+            );
+        }
+        const ctx = detectProjectContext(process.cwd());
+        console.log(
+            `Detected project context: framework=${ctx.framework}, language=${ctx.language}\n`
+        );
+        const frameworkContext = `
+            Project context:
+            - framework: ${ctx.framework}
+            - language: ${ctx.language}
+
+            Framework guardrails:
+            - If framework is Vue and file is a .vue SFC using <script setup>,
+            declarations inside <script setup> are available to the template regardless of order.
+            Do NOT report:
+            - best practices or framework advice (e.g., "use computed", "avoid functions in templates", "not reactive context")
+            - micro-optimizations (memoization, function recreation, etc.) unless the diff clearly introduces a meaningful regression
+
+            `;
+        const scan = await scanCodeDiff(config, diff, prompt, frameworkContext);
 
         if (scan.issues.length > 0) {
             console.log("\n⚠️ Scan findings:\n");

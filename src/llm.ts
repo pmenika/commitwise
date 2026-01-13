@@ -41,61 +41,28 @@ function truncate(diff: string) {
 
 export async function scanCodeDiff(
     config: AiCommitConfig,
-    diff: string
+    diff: string,
+    systemPrompt: string,
+    contextText?: string
 ): Promise<ScannedResult> {
     const client = getClient(config);
     const model = config.model;
     const truncatedDiff = truncate(diff);
-    const SYSTEM_PROMPT = `
-        You are a pre-commit safety scanner.
 
-        Report ONLY issues that are TRUE NOW and PROVABLE from the provided staged diff.
-        Only report issues likely to cause:
-        - runtime errors
-        - incorrect behavior
-        - security vulnerabilities
-        - crashes
+    const userContent = `
+        ${contextText ? contextText : ""}
+        Here is the staged git diff:
 
-        HARD RULES:
-        - Do NOT report any issue unless the diff explicitly shows the problem.
-        - If you cannot point to a concrete changed line/pattern in the diff, return {"issues":[]}.
-        - Do NOT invent "could be undefined/null" scenarios.
-
-        Do NOT report:
-        - speculative/hypothetical concerns ("if X is undefined/null…", "ensure X exists…")
-        - best practices, refactors, style, performance, UI/CSS
-        - "missing/undefined/null" warnings for statically typed code (TypeScript, defineProps<Props>(), typed emits)
-        UNLESS the diff introduces optional/nullable/unsafe typing or access (?:, null/undefined unions, any, unknown, casts, optional chaining, non-null assertions, removed guards)
-
-        ASSUME:
-        - Required typed props/values are present and correctly shaped at runtime unless the diff weakens types.
-
-        OUTPUT JSON ONLY in this exact shape:
-        {
-        "issues": [
-            {
-            "file": "path/from the diff header (+++ b/...) without the leading b/",
-            "issue": "short, concrete problem"
-            }
-        ]
-        }
-
-        Rules for "file":
-        - Extract it from diff headers (lines like '+++ b/<path>').
-        - If an issue spans multiple files, create separate issues per file.
-        - Do NOT use placeholders like 'unknown' unless no file headers exist.
-
-        If no evidence-backed issues exist, return {"issues": []}.
-        Keep the response short.
-    `;
+        ${truncatedDiff}
+        `.trim();
 
     const completion = await client.chat.completions.create({
         model,
         messages: [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: systemPrompt },
             {
                 role: "user",
-                content: `Here is the staged git diff:\n\n${truncatedDiff}`,
+                content: userContent,
             },
         ],
 
@@ -177,4 +144,87 @@ export async function generateCommitMessage(
 
     // Ensure it's a single line (commit subject)
     return msg.split("\n")[0] ?? msg;
+}
+
+export async function summarizeCheckOutput(
+    config: AiCommitConfig,
+    checkName: string,
+    checkOutput: string
+): Promise<{
+    summary: string;
+    topIssues: Array<{ file?: string; issue: string }>;
+}> {
+    const client = getClient(config);
+    const model = config.model;
+
+    const SYSTEM_PROMPT = `
+        You are a build/typecheck/lint/test output explainer for a frontend project.
+
+        Rules:
+        - Summarize ONLY what the tool output says (no new speculation).
+        - Extract the most actionable issues first.
+        - If file paths exist in the output, include them.
+        - Keep it short and practical.
+
+        Output JSON only in this exact shape:
+        {
+        "summary": "short summary",
+        "topIssues": [
+            { "file": "optional path", "issue": "actionable description" }
+        ]
+        }
+`;
+
+    const trimmed =
+        checkOutput.length > 15000 ? checkOutput.slice(0, 15000) : checkOutput;
+
+    const completion = await client.chat.completions.create({
+        model,
+        messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+                role: "user",
+                content: `Command: ${checkName}\n\nOutput:\n${trimmed}`,
+            },
+        ],
+        max_tokens: 300,
+        response_format: {
+            type: "json_schema",
+            json_schema: {
+                name: "check_explainer",
+                schema: {
+                    type: "object",
+                    properties: {
+                        summary: { type: "string" },
+                        topIssues: {
+                            type: "array",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    file: { type: "string" },
+                                    issue: { type: "string" },
+                                },
+                                required: ["issue"],
+                                additionalProperties: false,
+                            },
+                        },
+                    },
+                    required: ["summary", "topIssues"],
+                    additionalProperties: false,
+                },
+            },
+        },
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) return { summary: "Check failed.", topIssues: [] };
+
+    try {
+        return JSON.parse(content);
+    } catch {
+        return {
+            summary: "Check failed (could not parse summary).",
+            topIssues: [],
+        };
+    }
 }
