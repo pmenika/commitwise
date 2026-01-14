@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import type { AiCommitConfig } from "./configTypes.js";
-import { defaultConfig } from "./configTypes.js";
+import type { AiCommitConfig } from "./types.js";
+import { defaultConfig } from "./types.js";
 
 function readJsonIfExists(filePath: string): Partial<AiCommitConfig> | null {
     if (!fs.existsSync(filePath)) return null;

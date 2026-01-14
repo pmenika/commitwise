@@ -34,7 +34,16 @@ git add .
 commitwise auto
 ```
 
-Scans staged changes, generates a commit message, and lets you accept/edit/regenerate.
+Scans staged changes (if enabled), generates a commit message, and lets you accept/edit/regenerate.
+
+### Scan only
+
+```bash
+git add .
+commitwise scan
+```
+
+Runs checks and AI scan on staged changes without generating a commit message or committing.
 
 ### Suggest only
 
@@ -43,7 +52,7 @@ git add .
 commitwise suggest
 ```
 
-Prints a commit message without committing.
+Prints a commit message without committing or scanning.
 
 ## Configuration
 
