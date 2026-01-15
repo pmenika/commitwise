@@ -12,7 +12,7 @@ CommitWise leverages OpenAI's GPT models to automatically generate meaningful, [
 ## 📑 Table of Contents
 
 -   [✨ Features](#-features)
--   [🚀 Installation](#-installation)
+-   [� Installation](#-installation)
 -   [⚙️ Setup](#️-setup)
 -   [📖 Usage](#-usage)
 -   [🔧 Configuration](#-configuration)
