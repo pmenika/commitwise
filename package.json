@@ -1,8 +1,16 @@
 {
   "name": "commitwise",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered Git commit message generator using OpenAI GPT",
-  "keywords": ["git", "commit", "ai", "openai", "cli", "conventional-commits", "commitwise"],
+  "keywords": [
+    "git",
+    "commit",
+    "ai",
+    "openai",
+    "cli",
+    "conventional-commits",
+    "commitwise"
+  ],
   "license": "ISC",
   "author": "Purnima Van der Laan",
   "type": "module",
