@@ -253,9 +253,9 @@ git add path/to/file.ts
 
 ---
 
-## 📄 License
+## License
 
-ISC © Purnima Van der Laan
+MIT © Purnima Madhubhashi
 
 ---
 

@@ -11,7 +11,7 @@
     "conventional-commits",
     "commitwise"
   ],
-  "license": "ISC",
+  "license": "MIT",
   "author": "Purnima Van der Laan",
   "type": "module",
   "main": "dist/cli/index.js",
