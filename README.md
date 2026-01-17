@@ -147,19 +147,19 @@ CommitWise can be configured via `.commitwiserc.json` in your home directory (`~
 
 ### Configuration Options
 
-| Option                   | Type      | Default       | Description                                       |
-| ------------------------ | --------- | ------------- | ------------------------------------------------- |
-| `openaiApiKey`           | `string`  | `undefined`   | Your OpenAI API key (can also use env variable)   |
-| `model`                  | `string`  | `gpt-4o-mini` | OpenAI model to use for generation                |
-| `maxCommitMessageLength` | `number`  | `72`          | Maximum length of the commit message subject line |
-| `scanEnabled`            | `boolean` | `true`        | Enable/disable code scanning before committing    |
+| Option                   | Type      | Default     | Description                                       |
+| ------------------------ | --------- | ----------- | ------------------------------------------------- |
+| `openaiApiKey`           | `string`  | `undefined` | Your OpenAI API key (can also use env variable)   |
+| `model`                  | `string`  | `gpt-4o`    | OpenAI model to use for generation                |
+| `maxCommitMessageLength` | `number`  | `72`        | Maximum length of the commit message subject line |
+| `scanEnabled`            | `boolean` | `true`      | Enable/disable code scanning before committing    |
 
 ### Example Configuration
 
 ```json
 {
     "openaiApiKey": "sk-your-api-key-here",
-    "model": "gpt-4o-mini",
+    "model": "gpt-4o",
     "maxCommitMessageLength": 72,
     "scanEnabled": true
 }
@@ -169,8 +169,8 @@ CommitWise can be configured via `.commitwiserc.json` in your home directory (`~
 
 You can use any OpenAI chat model:
 
--   `gpt-4o-mini` (default, cost-effective)
--   `gpt-4o`
+-   `gpt-4o-mini` (default)
+-   `gpt-4o` (default)
 -   `gpt-4-turbo`
 -   `gpt-4`
 
