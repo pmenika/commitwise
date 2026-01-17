@@ -169,7 +169,7 @@ CommitWise can be configured via `.commitwiserc.json` in your home directory (`~
 
 You can use any OpenAI chat model:
 
--   `gpt-4o-mini` (default)
+-   `gpt-4o-mini`
 -   `gpt-4o` (default)
 -   `gpt-4-turbo`
 -   `gpt-4`
