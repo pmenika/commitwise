@@ -8,5 +8,5 @@ export type AiCommitConfig = {
 export const defaultConfig: AiCommitConfig = {
     maxCommitMessageLength: 72,
     scanEnabled: true,
-    model: "gpt-4o-mini",
+    model: "gpt-4o",
 };
