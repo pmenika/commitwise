@@ -1,6 +1,6 @@
 {
   "name": "commitwise",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "AI-powered Git commit message generator using OpenAI GPT",
   "keywords": [
     "git",
