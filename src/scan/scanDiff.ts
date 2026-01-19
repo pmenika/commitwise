@@ -10,7 +10,7 @@ interface ScannedResult {
     issues: ScannedIssue[];
 }
 
-const MAX_CHARS = 15000;
+const MAX_CHARS = 50000;
 
 function resolveApiKey(config: AiCommitConfig): string {
     const envKey = process.env.OPENAI_API_KEY?.trim();
@@ -35,7 +35,16 @@ function getClient(config: AiCommitConfig): OpenAI {
 }
 
 function truncate(diff: string): string {
-    return diff.length > MAX_CHARS ? diff.slice(0, MAX_CHARS) : diff;
+    if (diff.length > MAX_CHARS) {
+        console.log(
+            `\n⚠️  Warning: Diff is large (${diff.length} chars). Truncating to ${MAX_CHARS} chars for AI analysis.`
+        );
+        console.log(
+            "   Consider committing in smaller batches for more accurate scanning.\n"
+        );
+        return diff.slice(0, MAX_CHARS);
+    }
+    return diff;
 }
 
 export async function scanCodeDiff(
@@ -65,7 +74,7 @@ export async function scanCodeDiff(
             },
         ],
 
-        max_tokens: 150,
+        max_tokens: 500,
         response_format: {
             type: "json_schema",
             json_schema: {

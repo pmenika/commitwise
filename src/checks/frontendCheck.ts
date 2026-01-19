@@ -21,7 +21,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { execSync, spawnSync } from "child_process";
+import { execFileSync, spawnSync } from "child_process";
 
 // -------------------- Types --------------------
 
@@ -79,8 +79,13 @@ function run(
     args: string[],
     cwd: string
 ): { ok: boolean; output: string } {
-    const r = spawnSync(program, args, { cwd, encoding: "utf8" });
-    const output = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
+    const r = spawnSync(program, args, {
+        cwd,
+        encoding: "utf8",
+        shell: false,
+    });
+    const output =
+        `${r.stdout ?? ""}${r.stderr ?? ""}${r.error ? "\n" + r.error.message : ""}`.trim();
     return { ok: (r.status ?? 1) === 0, output };
 }
 
@@ -141,15 +146,36 @@ function detectChecksFromPackageJson(repoRoot: string): CheckCommand[] {
     /**
      * STEP 2C: Detect "test" script.
      * If present, this is usually the highest-confidence check.
+     * Also check for common variations like test:run, test:ci, test:unit, etc.
      */
-    if (scripts.test) {
-        // Most package managers support "pm test"
-        checks.push({
-            kind: "tests",
-            name: `${pm} test`,
-            program: pm,
-            args: ["test"],
-        });
+    const testScript = scripts.test
+        ? "test"
+        : scripts["test:run"]
+          ? "test:run"
+          : scripts["test:ci"]
+            ? "test:ci"
+            : scripts["test:unit"]
+              ? "test:unit"
+              : null;
+
+    if (testScript) {
+        if (testScript === "test") {
+            // Most package managers support "pm test" shorthand
+            checks.push({
+                kind: "tests",
+                name: `${pm} test`,
+                program: pm,
+                args: ["test"],
+            });
+        } else {
+            // For variants, use "pm run test:xxx"
+            checks.push({
+                kind: "tests",
+                name: `${pm} run ${testScript}`,
+                program: pm,
+                args: ["run", testScript],
+            });
+        }
     }
 
     /**
@@ -201,14 +227,28 @@ function detectTypecheckFallback(
     const tsconfig = path.join(repoRoot, "tsconfig.json");
     if (!exists(tsconfig)) return [];
 
-    // Vue detection: presence of a Vue config file or any .vue file is common.
-    // We'll do a lightweight check for common markers.
-    const isVue =
-        exists(path.join(repoRoot, "vite.config.ts")) ||
-        exists(path.join(repoRoot, "vite.config.js")) ||
-        exists(path.join(repoRoot, "vue.config.js")) ||
-        exists(path.join(repoRoot, "nuxt.config.ts")) ||
-        exists(path.join(repoRoot, "nuxt.config.js"));
+    // Vue detection: check package.json dependencies for Vue packages
+    // This is more accurate than checking config files (vite can be React/Svelte/etc.)
+    const pkgPath = path.join(repoRoot, "package.json");
+    let isVue = false;
+
+    if (exists(pkgPath)) {
+        const pkg = readJson(pkgPath);
+        if (pkg) {
+            const allDeps = {
+                ...pkg.dependencies,
+                ...pkg.devDependencies,
+                ...pkg.peerDependencies,
+            };
+            // Check for Vue or Nuxt packages
+            isVue = Object.keys(allDeps).some(
+                (dep) =>
+                    dep === "vue" ||
+                    dep.startsWith("@vue/") ||
+                    dep.startsWith("nuxt")
+            );
+        }
+    }
 
     // If it's likely Vue, prefer vue-tsc (more accurate for .vue templates).
     // NOTE: This requires vue-tsc to be installed in the project.
@@ -290,24 +330,47 @@ function createStagedWorktree(): { dir: string; cleanup: () => void } {
     const patchFile = path.join(base, "staged.patch");
 
     // STEP 5B: Add a detached worktree at HEAD
-    execSync(`git worktree add --detach "${wtDir}" HEAD`, { stdio: "ignore" });
+    execFileSync("git", ["worktree", "add", "--detach", wtDir, "HEAD"], {
+        stdio: "ignore",
+    });
 
     // STEP 5C: Export staged diff into a patch file
-    const patch = execSync("git diff --cached", { encoding: "utf8" });
+    const patch = execFileSync("git", ["diff", "--cached"], {
+        encoding: "utf8",
+    });
     fs.writeFileSync(patchFile, patch, "utf8");
 
     // STEP 5D: Apply the staged patch inside the worktree
     if (patch.trim()) {
-        execSync(`git apply --whitespace=nowarn "${patchFile}"`, {
-            cwd: wtDir,
-            stdio: "ignore",
-        });
+        try {
+            execFileSync("git", ["apply", "--whitespace=nowarn", patchFile], {
+                cwd: wtDir,
+                stdio: "pipe",
+            });
+        } catch (e: any) {
+            // Cleanup before throwing error
+            try {
+                execFileSync("git", ["worktree", "remove", "--force", wtDir], {
+                    stdio: "ignore",
+                });
+            } catch {}
+            try {
+                fs.rmSync(base, { recursive: true, force: true });
+            } catch {}
+
+            throw new Error(
+                "Failed to apply staged patch in worktree. This can happen with partial hunks, renames, or conflicts.\n" +
+                    "Staged changes could not be reproduced for testing.\n" +
+                    (e?.stdout?.toString?.() ?? "") +
+                    (e?.stderr?.toString?.() ?? "")
+            );
+        }
     }
 
     // STEP 5E: Return worktree dir + cleanup function
     const cleanup = () => {
         try {
-            execSync(`git worktree remove --force "${wtDir}"`, {
+            execFileSync("git", ["worktree", "remove", "--force", wtDir], {
                 stdio: "ignore",
             });
         } catch {}
@@ -345,10 +408,74 @@ export function runBestFrontendCheck(repoRoot: string): CheckResult {
     const { dir, cleanup } = createStagedWorktree();
 
     try {
-        // STEP 6D: Run the check inside the worktree
+        // STEP 6D: Ensure dependencies are available in the worktree
+        // Strategy:
+        // 1) If repo root has node_modules, reuse it (fast, no network).
+        // 2) If not, try install (fallback).
+        // 3) If install fails, return error clearly.
+
+        const hasNodeModules = fs.existsSync(
+            path.join(repoRoot, "node_modules")
+        );
+        const wtNodeModules = path.join(dir, "node_modules");
+
+        if (hasNodeModules && !fs.existsSync(wtNodeModules)) {
+            // Reuse root deps to avoid reinstalling
+            try {
+                const linkType =
+                    process.platform === "win32" ? "junction" : "dir";
+                fs.symlinkSync(
+                    path.join(repoRoot, "node_modules"),
+                    wtNodeModules,
+                    linkType
+                );
+            } catch {
+                // If symlink fails (permissions), just continue; check may still work via npx
+            }
+        }
+
+        // If still no node_modules, install as a fallback
+        if (!fs.existsSync(wtNodeModules)) {
+            const pm = detectPm(repoRoot);
+
+            // Prefer a reproducible install if lockfile exists
+            let program: string;
+            let installArgs: string[];
+
+            if (pm === "pnpm") {
+                // Use npx for pnpm (not always globally installed)
+                program = "npx";
+                installArgs = ["-y", "pnpm", "install", "--frozen-lockfile"];
+            } else if (pm === "yarn") {
+                // Use npx for yarn (safer fallback)
+                program = "npx";
+                installArgs = ["-y", "yarn", "install", "--frozen-lockfile"];
+            } else {
+                // npm is always present if node is present - call it directly
+                const hasLockfile = exists(
+                    path.join(repoRoot, "package-lock.json")
+                );
+                program = "npm";
+                installArgs = hasLockfile ? ["ci"] : ["install"];
+            }
+
+            const installResult = run(program, installArgs, dir);
+
+            if (!installResult.ok) {
+                return {
+                    ran: true,
+                    ok: false,
+                    kind: best.kind,
+                    name: best.name,
+                    output: `Failed to install dependencies in worktree:\n${installResult.output}`,
+                };
+            }
+        }
+
+        // STEP 6E: Run the check inside the worktree
         const result = run(best.program, best.args, dir);
 
-        // STEP 6E: Return structured results for CLI printing
+        // STEP 6F: Return structured results for CLI printing
         return {
             ran: true,
             ok: result.ok,
@@ -357,7 +484,7 @@ export function runBestFrontendCheck(repoRoot: string): CheckResult {
             output: result.output,
         };
     } finally {
-        // STEP 6F: Always clean up the temp worktree
+        // STEP 6G: Always clean up the temp worktree
         cleanup();
     }
 }

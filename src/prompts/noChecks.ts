@@ -19,6 +19,8 @@ HARD RULES:
 - Do NOT report any issue unless the diff/context explicitly shows the problem.
 - If you cannot point to a concrete changed line or pattern, return {"issues":[]}.
 - Do NOT invent "could be undefined/null" scenarios.
+- Do NOT report duplicate definitions if a function/variable is both removed (-) and added (+) in the same diff - this is a REFACTORING, not a duplicate.
+- Only report duplicates if multiple definitions exist in the added lines (+) without corresponding removals.
 
 WHAT TO LOOK FOR:
 - runtime or crash risks introduced by the change
